@@ -3,19 +3,18 @@
 # Game Plan
 # Python Programm runs for 1h, then scheduled again for every 1h during 6am and 22pm by cron. 
 # Pkill and pkill-9  by cron before each start. This is for robustness. 
-# New modbus tcp connection every 30min. 
 # Installorupdate.sh from github master branch. similar to https://github.com/snaptec/openWB/blob/master/openwb-install.sh
 # --> put script into /etc/cron.daily/
 # https://www.cyberciti.biz/faq/how-do-i-add-jobs-to-cron-under-linux-or-unix-oses/
 
-# Note
+# Note on the Huawei Sun2000 inverter
 # Initially, I had V100R001C00SPC125 installed on the SDongleA-05, which had very unstable
 # modbus TCP connections. Got several minutes of not being able to connect during the day. 
 # Upgrading the Dongle to V100R001C00SPC133 made this only slightly better. The issue still exists. 
 # Apparently, this can only be fixed by connecting to the internal Wifi AP of the inverter
 # see: https://skyboo.net/2022/02/huawei-sun2000-why-using-a-usb-dongle-for-monitoring-is-not-a-good-idea/
 # 
-# Update: upgrading the inverter from V148 to V152 changed things for the better. Getting more stable
+# Update: updating the dongle from V148 to V152 changed things for the better. Getting more stable
 # responses now, even though sometimes still connection errors happen. The dongle seems to like to reboot once a day or so. 
 # For now, to me the winning combination seems to be V133 for SDongleA-05 and V152 for the SUN2000-10KTL-M1. 
 
@@ -110,9 +109,9 @@ class Sun2000Client:
 
         # change the default modbus socket timeout to 10 secs (from 2)
         from pymodbus.constants import Defaults
-        Defaults.Timeout = 10  
+        Defaults.Timeout = 15  
 
-        self.client = ModbusTcpClient(host, 502, timeout=10) #502 is default modbus port
+        self.client = ModbusTcpClient(host, 502, timeout=15) #502 is default modbus port
 
     def connect(self):
         if not self.isConnected(): 
