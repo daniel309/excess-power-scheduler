@@ -2,7 +2,7 @@
 
 # Game Plan
 # Python Programm runs for 1h, then scheduled again for every 1h during 6am and 22pm by cron. 
-# Pkill and pkill-9  by cron before next start. This is for robustness. 
+# Pkill and pkill-9  by cron before each start. This is for robustness. 
 # New modbus tcp connection every 30min. 
 # Installorupdate.sh from github master branch. similar to https://github.com/snaptec/openWB/blob/master/openwb-install.sh
 # --> put script into /etc/cron.daily/
@@ -18,20 +18,7 @@
 # Update: upgrading the inverter from V148 to V152 changed things for the better. Getting more stable
 # responses now, even though sometimes still connection errors happen. The dongle seems to like to reboot once a day or so. 
 # For now, to me the winning combination seems to be V133 for SDongleA-05 and V152 for the SUN2000-10KTL-M1. 
-#
-# Example of sporadic errors, these usually go away after about 10min
-#ERROR:pymodbus.client.sync:Connection to (192.168.1.99, 502) failed: [Errno 65] No route to host
-#ERROR:root:Connection to inverter failed
-#ERROR:pymodbus.client.sync:Connection to (192.168.1.99, 502) failed: timed out
-#ERROR:root:Connection to inverter failed
 
-
-#import sys
-#sys.path.append("../sun2000_modbus") # override to use local fork
-
-# uses https://github.com/olivergregorius/sun2000_modbus
-#from sun2000_modbus.inverter import Sun2000
-#from sun2000_modbus import registers
 
 from pymodbus.client.sync import ModbusTcpClient
 from pymodbus.exceptions import ModbusIOException, ConnectionException
