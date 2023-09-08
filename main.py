@@ -3,9 +3,6 @@
 # Game Plan
 # Python Programm runs for 1h, then scheduled again for every 1h during 6am and 22pm by cron. 
 # Pkill and pkill-9  by cron before each start. This is for robustness. 
-# Installorupdate.sh from github master branch. similar to https://github.com/snaptec/openWB/blob/master/openwb-install.sh
-# --> put script into /etc/cron.daily/
-# https://www.cyberciti.biz/faq/how-do-i-add-jobs-to-cron-under-linux-or-unix-oses/
 
 # Note on the Huawei Sun2000 inverter
 # Initially, I had V100R001C00SPC125 installed on the SDongleA-05, which had very unstable
@@ -117,10 +114,10 @@ class Sun2000Client:
         if not self.isConnected(): 
             logging.info("Connecting to inverter...")
             self.client.connect()
-            logging.info("sleeping")
-            time.sleep(3) # required, wait at least 2secs after connect
 
             if self.isConnected():
+                logging.info("sleeping")
+                time.sleep(3) # required, wait at least 2secs after connect
                 logging.info('Successfully connected to inverter')
                 return True
             else:
@@ -131,7 +128,9 @@ class Sun2000Client:
         return self.client.is_socket_open()
     
     def disconnect(self):
+        logging.info("disconnecting from inverter...")
         self.client.close()
+        logging.info("done.")
     
     
     ### data reading part ###
@@ -259,6 +258,17 @@ class PowerScheduler:
 
     def __init__(self):
         self.inverter = Sun2000Client(host = '192.168.1.51', unit = 1)
+
+        # exit handler
+        import atexit
+        atexit.register(self.inverter.disconnect)
+        import signal
+        signal.signal(signal.SIGTERM, self.handle_exit)
+        signal.signal(signal.SIGINT, self.handle_exit)
+
+    def handle_exit(self, signum, frame):
+        import sys
+        sys.exit(0)
     
     def readHouseActivePower(self):
         excessPower = None
@@ -283,11 +293,11 @@ class PowerScheduler:
 
             if gridPower!= None and batteryPower != None: 
                 if batteryPower <= 0 and gridPower <= 0:    # battery discharging and importing from grid.
-                    excessPower = batteryPower + gridPower  # --> return negative sum of all consumers. nothing to schedule.
+                    excessPower = batteryPower + gridPower  # --> return negative sum of all consumers. 
                 elif batteryPower >= 0 and gridPower <= 0:  # battery charging, but importing from grid.
-                    excessPower = gridPower - batteryPower  # --> return negative sum. the moment we are charging we dont want to schedule anything.
+                    excessPower = gridPower - batteryPower  # --> return negative sum. the moment we are charging battery we dont want to schedule anything.
                 elif batteryPower <= 0 and gridPower >= 0:  # battery discharing, and feeding to grid.
-                    excessPower = gridPower + batteryPower  # --> return delta. we can only schedule the delta above charging
+                    excessPower = batteryPower - gridPower  # --> return negative sum: any excess power while battery is discharging is coming from battery
                 elif batteryPower >= 0 and gridPower >= 0:  # battery charging, feeding to grid.
                     excessPower = gridPower #+batteryPower  # --> we only want to schedule the excess of the grid feed, always prefer to charge the battery.
                 else: # impossible
@@ -318,14 +328,13 @@ class PowerScheduler:
             time.sleep(30)
         self.inverter.disconnect()
 
-
 ## main
 if __name__ == '__main__':
     logging.info("### Starting Excess Power Scheduler ###")
 
     sched = PowerScheduler()
-    sched.runFiniteSchedulerLoop()
 
+    sched.runFiniteSchedulerLoop()
     #sched.scheduler.schedule(2000.0)
 
     #sched.scheduler.schedule(-2000.0)
