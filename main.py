@@ -208,7 +208,7 @@ class ExcessPowerScheduler:
         self.devices = devices
 
     def schedule(self, power):
-        logging.info("## New scheduler cycle. power=%s, times_negative=%s", power, self.times_power_negative)
+        logging.info("## %s: New scheduler cycle. power=%s, times_negative=%s", datetime.now(), power, self.times_power_negative)
 
         if power == None: return  # error reading house power. ignore.
 
@@ -292,16 +292,16 @@ class PowerScheduler:
                 logging.info("Battery power (+charge/-discharge): %s", batteryPower)
 
             if gridPower!= None and batteryPower != None: 
-                if batteryPower <= 0 and gridPower <= 0:    # battery discharging and importing from grid.
+                if batteryPower < 0 and gridPower <= 0:    # battery discharging and importing from grid.
                     excessPower = batteryPower + gridPower  # --> return negative sum of all consumers. 
                 elif batteryPower >= 0 and gridPower <= 0:  # battery charging, but importing from grid.
                     excessPower = gridPower - batteryPower  # --> return negative sum. the moment we are charging battery we dont want to schedule anything.
-                elif batteryPower <= 0 and gridPower >= 0:  # battery discharing, and feeding to grid.
+                elif batteryPower < 0 and gridPower >= 0:  # battery discharing, and feeding to grid.
                     excessPower = batteryPower - gridPower  # --> return negative sum: any excess power while battery is discharging is coming from battery
                 elif batteryPower >= 0 and gridPower >= 0:  # battery charging, feeding to grid.
                     excessPower = gridPower #+batteryPower  # --> we only want to schedule the excess of the grid feed, always prefer to charge the battery.
                 else: # impossible
-                    excessPower = gridPower 
+                    excessPower = gridPower
         except (ModbusIOException, ConnectionException) as ex:
             logging.exception(ex) # print and continue
         
