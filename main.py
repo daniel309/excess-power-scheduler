@@ -3,6 +3,7 @@
 # Game Plan
 # Python Programm runs for 1h, then scheduled again for every 1h during 6am and 22pm by cron. 
 # Pkill and pkill-9  by cron before each start. This is for robustness. 
+# Alternative: systemd unit
 
 # Note on the Huawei Sun2000 inverter
 # Initially, I had V100R001C00SPC125 installed on the SDongleA-05, which had very unstable
@@ -14,6 +15,11 @@
 # Update: updating the dongle from V148 to V152 changed things for the better. Getting more stable
 # responses now, even though sometimes still connection errors happen. The dongle seems to like to reboot once a day or so. 
 # For now, to me the winning combination seems to be V133 for SDongleA-05 and V152 for the SUN2000-10KTL-M1. 
+
+# Update2: https://gitlab.com/Emilv2/huawei-solar has the Huawei magic bytes added to the modbus communication 
+# (apparently from reversing the modbus communication between SDongle, Meter and Battery). It also has a few tricks 
+# added such as a heart-beat write to a magic modbus register (49999) every 15 secs to avoid closing the connection. 
+# Maybe use this instead of our own modbus implementation?
 
 
 from pymodbus.client.sync import ModbusTcpClient
@@ -89,6 +95,14 @@ class ShellyRelayDevice(ScheduleableDevice):
 # https://go-e.co/app/api.pdf
 # https://www.goingelectric.de/forum/viewtopic.php?p=1797041&sid=f1cbeedd532aecfc261755320adbb3ee#p1797041
 # https://github.com/goecharger/go-eCharger-API-v2/blob/main/http-de.md
+
+# TODO
+# Model AIP heatpump as on/off device and decide if we want to use the luxtronic python API or just
+# flip a shelly switch connected to the SGReady input wires. 
+# https://github.com/Bouni/luxtronik, 
+# https://github.com/Bouni/python-luxtronik/ 
+# https://wiki.fhem.de/wiki/Luxtronik_2.0
+# https://www.haustechnikdialog.de/Forum/t/229858/Alpha-Innotec-WZSV-SG-Ready-funktioniert-nicht
 
 
 class Sun2000Client:
