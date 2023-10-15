@@ -117,7 +117,7 @@ class Sun2000Client:
     def __init__(self, host, slave):
         self.host = host
         self.slave = slave
-        self.client = ModbusTcpClient(host=host, port=502, timeout=15, reconnect_delay=3, retry_on_empty=True)
+        self.client = ModbusTcpClient(host=host, port=502, timeout=20, retries=10, reconnect_delay=3, retry_on_empty=True)
 
     def connect(self):
         if not self.isConnected(): 
