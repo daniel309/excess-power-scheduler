@@ -22,7 +22,7 @@
 # Maybe use this instead of our own modbus implementation?
 
 
-from pymodbus.client.sync import ModbusTcpClient
+from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ModbusIOException, ConnectionException
 from datetime import datetime
 from dataclasses import dataclass
@@ -111,18 +111,13 @@ class Sun2000Client:
     # and https://javierin.com/wp-content/uploads/sites/2/2021/09/Solar-Inverter-Modbus-Interface-Definitions.pdf
 
     host:str
-    unit:int
+    slave:int
     client = None
 
-    def __init__(self, host, unit):
+    def __init__(self, host, slave):
         self.host = host
-        self.unit = unit
-
-        # change the default modbus socket timeout to 10 secs (from 2)
-        from pymodbus.constants import Defaults
-        Defaults.Timeout = 15  
-
-        self.client = ModbusTcpClient(host, 502, timeout=15) #502 is default modbus port
+        self.slave = slave
+        self.client = ModbusTcpClient(host=host, port=502, timeout=15, reconnect_delay=3, retry_on_empty=True)
 
     def connect(self):
         if not self.isConnected(): 
@@ -160,7 +155,7 @@ class Sun2000Client:
 
         #this reads 15 2-byte values (each register is 2 bytes) = 30 bytes and adds 1 len byte at front. result is 31 bytes
         #we are interested in the first 2 bytes and the last 4 bytes of the reponse (registers 37100 and 37113)
-        result = self.client.read_holding_registers(37100, 15, unit = self.unit)  
+        result = self.client.read_holding_registers(37100, 15, slave=self.slave)  
         if type(result) == ModbusIOException: raise result
         
         MeterStatus = {
@@ -179,7 +174,7 @@ class Sun2000Client:
         
         #this reads 5 2-byte values (each register is 2 bytes) = 10 bytes and adds 1 len byte at front. result is 11 bytes
         #we are interested in the first 2 bytes and the last 4 bytes of the reponse (registers 37762 and 37765)
-        result = self.client.read_holding_registers(37762, 5, unit = self.unit)  
+        result = self.client.read_holding_registers(37762, 5, slave=self.slave)  
         if type(result) == ModbusIOException: raise result
        
         RunningStatus = {
@@ -271,7 +266,7 @@ class PowerScheduler:
         ])
 
     def __init__(self):
-        self.inverter = Sun2000Client(host = '192.168.1.51', unit = 1)
+        self.inverter = Sun2000Client(host = '192.168.1.51', slave=1)
 
         # exit handler
         import atexit
@@ -354,4 +349,4 @@ if __name__ == '__main__':
     #sched.scheduler.schedule(-2000.0)
     #sched.scheduler.schedule(-2000.0)
     #sched.scheduler.schedule(-2000.0)
-   
+
