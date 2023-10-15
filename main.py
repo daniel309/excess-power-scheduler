@@ -239,7 +239,7 @@ class ExcessPowerScheduler:
         elif power < self.NEGATIVE_POWER_SAFETY_MARGIN:
             ## oh oh, too much scheduled. we import from grid now. drop loads!
             self.times_power_negative += 1
-            if self.times_power_negative >= self.POWER_OFF_HYSTERESIS:
+            if self.times_power_negative > self.POWER_OFF_HYSTERESIS:
                 for dev in reversed(self.devices): # traverse in reverse order
                     logging.info("Checking if we can turn OFF device: %s with state: %s and limit_counter: %s", 
                         dev.name, dev.state, dev.times_wattage_exceeded)
