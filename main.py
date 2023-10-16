@@ -324,7 +324,8 @@ class PowerScheduler:
                 else: time.sleep(30)
 
     def runFiniteSchedulerLoop(self): 
-        for x in range(2 * 60): #60min
+        while(True):
+        #for x in range(2 * 60): #60min
             start = time.time()
             power = self.readHouseActivePower()
             elapsed = time.time() - start
