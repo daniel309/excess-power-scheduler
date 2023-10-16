@@ -223,6 +223,8 @@ class ExcessPowerScheduler:
 
         if power > self.POSITIVE_POWER_SAFETY_MARGIN:
             ## ok, we have excess power!
+            self.times_power_negative = 0
+
             for dev in self.devices:
                 logging.info("Checking if we can turn ON device: %s with state: %s and limit_counter: %s", 
                     dev.name, dev.state, dev.times_wattage_exceeded)
@@ -250,7 +252,9 @@ class ExcessPowerScheduler:
                 self.times_power_negative = 0
         
         else:
-            self.times_power_negative = 0 # reset negative power count
+            ## we are in-between safety margins. Very little excess power, but also little to none power import
+            ## do nothing, we have reached optimial consumption :-)
+            self.times_power_negative = 0
 
     def __resetAllDeviceCounters(self):
         for dev in self.devices:
