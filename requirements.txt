@@ -1,0 +1,2 @@
+pymodbus==3.5.2
+requests==2.28.2
