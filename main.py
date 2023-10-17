@@ -35,6 +35,19 @@ import logging
 logging.basicConfig(level = logging.INFO)
 
 
+############################################################################
+# CONFIGURATION
+############################################################################
+@dataclass(frozen=True)
+class Settings:
+    InverterIP: str = '192.168.1.51'
+    InverterPort: int = 502
+    InverterSlaveID: int = 1
+    SchedulerLoopPauseInSeconds: int = 30
+    Devices: any = []  #ShellyRelayDevice('heating_high', 1800, '192.168.1.84') list
+############################################################################
+
+
 class ScheduleableDevice:
     """Device with known power consumption that can be scheduled (turned on and off at will)"""
     name: str
@@ -114,10 +127,11 @@ class Sun2000Client:
     slave:int
     client = None
 
-    def __init__(self, host, slave):
+    def __init__(self, slave):
         self.host = host
         self.slave = slave
-        self.client = ModbusTcpClient(host=host, port=502, timeout=20, retries=10, reconnect_delay=3, retry_on_empty=True)
+        self.client = ModbusTcpClient(host=Settings.InverterIP, port=Settings.InverterPort, 
+                                      timeout=20, retries=10, reconnect_delay=3, retry_on_empty=True)
 
     def connect(self):
         if not self.isConnected(): 
@@ -270,7 +284,7 @@ class PowerScheduler:
         ])
 
     def __init__(self):
-        self.inverter = Sun2000Client(host = '192.168.1.51', slave=1)
+        self.inverter = Sun2000Client(slave=Settings.InverterSlaveID)
 
         # exit handler
         import atexit
@@ -327,9 +341,8 @@ class PowerScheduler:
                 if self.inverter.connect(): break
                 else: time.sleep(30)
 
-    def runFiniteSchedulerLoop(self): 
+    def runSchedulerLoop(self): 
         while(True):
-        #for x in range(2 * 60): #60min
             start = time.time()
             power = self.readHouseActivePower()
             elapsed = time.time() - start
@@ -339,7 +352,7 @@ class PowerScheduler:
 
             self.scheduler.schedule(power) 
 
-            time.sleep(30)
+            time.sleep(Settings.SchedulerLoopPauseInSeconds)
         self.inverter.disconnect()
 
 ## main
@@ -348,7 +361,7 @@ if __name__ == '__main__':
 
     sched = PowerScheduler()
 
-    sched.runFiniteSchedulerLoop()
+    sched.runSchedulerLoop()
     #sched.scheduler.schedule(2000.0)
 
     #sched.scheduler.schedule(-2000.0)

@@ -34,7 +34,7 @@ then
 	echo "...ok"
 else
     echo "installing cronjob..."
-	echo "0 6-22 * * * /opt/excess-power-scheduler/main.py" >> /etc/crontab+
+	echo "0 6-22 * * * /opt/excess-power-scheduler/main.py" >> /etc/crontab
     echo "...done"
 
 
