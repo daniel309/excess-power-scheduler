@@ -1,0 +1,10 @@
+[Unit]
+Description=Excess Power Scheduler
+
+[Service]
+ExecStart=/usr/local/excess-power-scheduler/main.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,7 @@
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
+# stop scheduler at 22:30
+30 22 * * * root /usr/bin/systemctl stop power-scheduler.service&
+# start scheduler at 06:00
+0 6 * * * root /usr/bin/systemctl start power-scheduler.service&
+
