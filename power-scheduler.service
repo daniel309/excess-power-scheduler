@@ -2,6 +2,7 @@
 Description=Excess Power Scheduler
 
 [Service]
+# https://www.tderflinger.com/en/using-systemd-to-start-a-python-application-with-virtualenv
 ExecStart=/usr/local/excess-power-scheduler/main.py
 Restart=on-failure
 

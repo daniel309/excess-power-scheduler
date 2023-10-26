@@ -35,6 +35,7 @@ import logging
 logging.basicConfig(level = logging.INFO)
 
 
+
 ############################################################################
 # CONFIGURATION
 ############################################################################
@@ -43,9 +44,12 @@ class Settings:
     InverterIP: str = '192.168.1.51'
     InverterPort: int = 502
     InverterSlaveID: int = 1
+    InverterRequestTimeoutSeconds:int = 20
+    InverterMaxRequestRetries:int = 5
     SchedulerLoopPauseInSeconds: int = 30
-    Devices: any = []  #ShellyRelayDevice('heating_high', 1800, '192.168.1.84') list
+    #ScheduleableDevices: any = []  #ShellyRelayDevice('heating_high', 1800, '192.168.1.84') list
 ############################################################################
+
 
 
 class ScheduleableDevice:
@@ -123,15 +127,15 @@ class Sun2000Client:
     # based on https://github.com/olivergregorius/sun2000_modbus
     # and https://javierin.com/wp-content/uploads/sites/2/2021/09/Solar-Inverter-Modbus-Interface-Definitions.pdf
 
-    host:str
-    slave:int
     client = None
 
-    def __init__(self, slave):
-        self.host = host
-        self.slave = slave
-        self.client = ModbusTcpClient(host=Settings.InverterIP, port=Settings.InverterPort, 
-                                      timeout=20, retries=10, reconnect_delay=3, retry_on_empty=True)
+    def __init__(self):
+        self.client = ModbusTcpClient(host=Settings.InverterIP, 
+                                      port=Settings.InverterPort, 
+                                      timeout=Settings.InverterRequestTimeoutSeconds, 
+                                      retries=Settings.InverterMaxRequestRetries, 
+                                      reconnect_delay = 3, 
+                                      retry_on_empty = True)
 
     def connect(self):
         if not self.isConnected(): 
@@ -160,17 +164,16 @@ class Sun2000Client:
 
     @dataclass
     class MeterValues:
-        MeterStatus: str = 'n/a'
+        Status: str = 'n/a'
         ActivePower: int = 0
 
     def readPowerMeter(self): 
-        #MeterStatus = Register(37100, 1, datatypes.DataType.UINT16_BE, 1, None, AccessType.RO, mappings.MeterStatus)
-        #ActivePower = Register(37113, 2, datatypes.DataType.INT32_BE, 1, "W", AccessType.RO, None)
+        # MeterStatus = Register(37100, 1, datatypes.DataType.UINT16_BE, 1, None, AccessType.RO, mappings.MeterStatus)
+        # ActivePower = Register(37113, 2, datatypes.DataType.INT32_BE, 1, "W", AccessType.RO, None)
+        REGISTER_LOW = REGISTER_STATUS = 37100             ## smallest value
+        REGISTER_HIGH = REGISTER_ACTIVE_POWER = 37113      ## largest value
 
-        #this reads 15 2-byte values (each register is 2 bytes) = 30 bytes and adds 1 len byte at front. result is 31 bytes
-        #we are interested in the first 2 bytes and the last 4 bytes of the reponse (registers 37100 and 37113)
-        result = self.client.read_holding_registers(37100, 15, slave=self.slave)  
-        if type(result) == ModbusIOException: raise result
+        result = self.readInverterRegisters(REGISTER_LOW, REGISTER_HIGH)
         
         MeterStatus = {
             0: 'offline',
@@ -178,18 +181,25 @@ class Sun2000Client:
         }
 
         return Sun2000Client.MeterValues(
-            MeterStatus.get(self.__decode_uint_be(result.encode()[1:3])), # MeterStatus
-            self.__decode_int_be(result.encode()[27:31]) #ActivePower
+            MeterStatus.get(self.__decode_uint_be(result.encode()[self.calculateRegisterOffset(REGISTER_LOW, REGISTER_STATUS, 2)])), 
+            self.__decode_int_be(result.encode()[self.calculateRegisterOffset(REGISTER_LOW, REGISTER_ACTIVE_POWER, 4)]) 
         )
    
+    @dataclass
+    class BatteryValues:
+        Status: str = 'n/a'
+        ChargeDischargePower: int = 0
+        StateOfChargePercent: int = -42
+
     def readBattery(self): 
-        #RunningStatus = Register(37762, 1, datatypes.DataType.UINT16_BE, 1, None, AccessType.RO, mappings.RunningStatus)
-        #ChargeDischargePower = Register(37765, 2, datatypes.DataType.INT32_BE, 1, "W", AccessType.RO, None)
-        
-        #this reads 5 2-byte values (each register is 2 bytes) = 10 bytes and adds 1 len byte at front. result is 11 bytes
-        #we are interested in the first 2 bytes and the last 4 bytes of the reponse (registers 37762 and 37765)
-        result = self.client.read_holding_registers(37762, 5, slave=self.slave)  
-        if type(result) == ModbusIOException: raise result
+        # SOC = Register(37760, 1, datatypes.DataType.UINT16_BE, 10, "%", AccessType.RO, None)
+        # RunningStatus = Register(37762, 1, datatypes.DataType.UINT16_BE, 1, None, AccessType.RO, mappings.RunningStatus)
+        # ChargeDischargePower = Register(37765, 2, datatypes.DataType.INT32_BE, 1, "W", AccessType.RO, None)
+        REGISTER_LOW = REGISTER_SOC = 37760            ## smallest value
+        REGISTER_STATUS = 37762
+        REGISTER_HIGH = REGISTER_CHARGEDISCHARGE_POWER = 37765  ## largest value
+
+        result = self.readInverterRegisters(REGISTER_LOW, REGISTER_HIGH)
        
         RunningStatus = {
             0: 'offline',
@@ -199,11 +209,28 @@ class Sun2000Client:
             4: 'sleep mode'
         }
 
-        return Sun2000Client.MeterValues(
-            RunningStatus.get(self.__decode_uint_be(result.encode()[1:3])), # RunningStatus
-            self.__decode_int_be(result.encode()[7:11]) #ChargeDischargePower
+        return Sun2000Client.BatteryValues(
+            RunningStatus.get(self.__decode_uint_be(result.encode()[self.calculateRegisterOffset(REGISTER_LOW, REGISTER_STATUS, 2)])), 
+            self.__decode_int_be(result.encode()[self.calculateRegisterOffset(REGISTER_LOW, REGISTER_CHARGEDISCHARGE_POWER, 4)]), 
+            self.__decode_uint_be(result.encode()[self.calculateRegisterOffset(REGISTER_LOW, REGISTER_SOC, 2)]) / 10
         )
 
+    def readInverterRegisters(self, firstRegister:int, lastRegister:int):
+        REGISTER_SIZE:int = 2
+        #this reads n 2-byte values (each register is 2 bytes). The result adds 1 len byte at front, so is of size n*2+1.
+        result = self.client.read_holding_registers(firstRegister, 
+                                                    lastRegister - firstRegister + REGISTER_SIZE, 
+                                                    slave = Settings.InverterSlaveID)  
+        if type(result) == ModbusIOException: raise result
+        return result
+
+    def calculateRegisterOffset(self, firstRegister:int, readRegister:int, valueSize:int):
+        if (firstRegister > readRegister): raise ValueError
+        LEN_FIELD_SIZE:int = 1
+        REGISTER_SIZE:int = 2
+        return slice(LEN_FIELD_SIZE + (readRegister - firstRegister) * REGISTER_SIZE, 
+                     LEN_FIELD_SIZE + valueSize + (readRegister - firstRegister) * REGISTER_SIZE)
+    
     def __decode_string(self, value):
         return value.decode("utf-8", "replace").strip("\0")
 
@@ -220,12 +247,12 @@ class Sun2000Client:
 class ExcessPowerScheduler:
     """Check limits in order, once first limit exceeded inform caller and reset counters before next is checked"""
     devices = None
-    times_power_negative = 0
+    times_power_negative:int = 0
 
-    POSITIVE_POWER_SAFETY_MARGIN = 100 #watts
-    NEGATIVE_POWER_SAFETY_MARGIN = -20 #watts
-    POWER_ON_HYSTERESIS = 4 #num times limit exceeded consequtively as power ON condition
-    POWER_OFF_HYSTERESIS = 2 #num times limit exceeded consequtively as power OFF condition
+    POSITIVE_POWER_SAFETY_MARGIN:int = 100 #watts
+    NEGATIVE_POWER_SAFETY_MARGIN:int = -20 #watts
+    POWER_ON_HYSTERESIS:int = 4 #num times limit exceeded consequtively as power ON condition
+    POWER_OFF_HYSTERESIS:int = 2 #num times limit exceeded consequtively as power OFF condition
 
     def __init__(self, devices: typing.List[ScheduleableDevice]):
         self.devices = devices
@@ -284,7 +311,7 @@ class PowerScheduler:
         ])
 
     def __init__(self):
-        self.inverter = Sun2000Client(slave=Settings.InverterSlaveID)
+        self.inverter = Sun2000Client()
 
         # exit handler
         import atexit
@@ -307,16 +334,17 @@ class PowerScheduler:
             battery = self.inverter.readBattery()
 
             gridPower = None
-            logging.info("Meter status: %s", meter.MeterStatus)
-            if meter.MeterStatus == 'online':
+            logging.info("Meter status: %s", meter.Status)
+            if meter.Status == 'online':
                 gridPower = meter.ActivePower
                 logging.info("Meter power (+feed-to-grid/-use-from-grid): %s", gridPower)
 
             batteryPower = None
-            logging.info("Battery status: %s", battery.MeterStatus)
-            if battery.MeterStatus == 'running':
-                batteryPower = battery.ActivePower
+            logging.info("Battery status: %s", battery.Status)
+            if battery.Status == 'running':
+                batteryPower = battery.ChargeDischargePower
                 logging.info("Battery power (+charge/-discharge): %s", batteryPower)
+                logging.info("Battery SOC%: %s", battery.StateOfChargePercent)
 
             if gridPower!= None and batteryPower != None: 
                 if batteryPower < 0 and gridPower <= 0:    # battery discharging and importing from grid.
