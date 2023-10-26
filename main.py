@@ -344,7 +344,7 @@ class PowerScheduler:
             if battery.Status == 'running':
                 batteryPower = battery.ChargeDischargePower
                 logging.info("Battery power (+charge/-discharge): %s", batteryPower)
-                logging.info("Battery SOC%: %s", battery.StateOfChargePercent)
+                logging.info("Battery SOC%%: %s", battery.StateOfChargePercent)
 
             if gridPower!= None and batteryPower != None: 
                 if batteryPower < 0 and gridPower <= 0:    # battery discharging and importing from grid.
