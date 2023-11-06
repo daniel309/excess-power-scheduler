@@ -350,11 +350,11 @@ class PowerScheduler:
                 if batteryPower < 0 and gridPower <= 0:    # battery discharging and importing from grid.
                     excessPower = batteryPower + gridPower  # --> return negative sum of all consumers. 
                 elif batteryPower >= 0 and gridPower <= 0:  # battery charging, but importing from grid.
-                    excessPower = gridPower - batteryPower  # --> return negative sum. the moment we are charging battery we dont want to schedule anything.
+                    excessPower = gridPower + batteryPower  # --> return sum. the moment we are charging battery means we have excess power
                 elif batteryPower < 0 and gridPower >= 0:  # battery discharing, and feeding to grid.
                     excessPower = batteryPower - gridPower  # --> return negative sum: any excess power while battery is discharging is coming from battery
                 elif batteryPower >= 0 and gridPower >= 0:  # battery charging, feeding to grid.
-                    excessPower = gridPower #+batteryPower  # --> we only want to schedule the excess of the grid feed, always prefer to charge the battery.
+                    excessPower = gridPower + batteryPower  # --> there is plenty of excess power: grid feed and battery charge
                 else: # impossible
                     excessPower = gridPower
         except (ModbusIOException, ConnectionException) as ex:
